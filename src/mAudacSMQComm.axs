@@ -1,5 +1,5 @@
 MODULE_NAME='mAudacSMQComm'	(
-                                dev vdvControl,
+                                dev vdvObject,
                                 dev vdvCommObjects[],
                                 dev dvPort
                             )
@@ -151,7 +151,7 @@ DEFINE_MUTUALLY_EXCLUSIVE
 (* EXAMPLE: DEFINE_FUNCTION <RETURN_TYPE> <NAME> (<PARAMETERS>) *)
 (* EXAMPLE: DEFINE_CALL '<NAME>' (<PARAMETERS>) *)
 define_function SendStringRaw(char cString[]) {
-    NAVLog(NAVFormatStandardLogMessage(NAV_STANDARD_LOG_MESSAGE_TYPE_STRING_TO, dvPort, cString))
+    NAVErrorLog(NAV_LOG_LEVEL_DEBUG, NAVFormatStandardLogMessage(NAV_STANDARD_LOG_MESSAGE_TYPE_STRING_TO, dvPort, cString))
     send_string dvPort,"cString"
 }
 
@@ -166,13 +166,13 @@ define_function AddToQueue(char cString[], integer iPriority) {
 	case true: {	//Commands have priority over status requests
 	    select {
 		active (uQueue.iCommandHead == max_length_array(cCommandQueue)): {
-		    if (uQueue.iCommandTail <> 1) {
+		    if (uQueue.iCommandTail != 1) {
 			uQueue.iCommandHead = 1
 			cCommandQueue[uQueue.iCommandHead] = cString
 			uQueue.iHasItems = true
 		    }
 		}
-		active (uQueue.iCommandTail <> (uQueue.iCommandHead + 1)): {
+		active (uQueue.iCommandTail != (uQueue.iCommandHead + 1)): {
 		    uQueue.iCommandHead++
 		    cCommandQueue[uQueue.iCommandHead] = cString
 		    uQueue.iHasItems = true
@@ -182,13 +182,13 @@ define_function AddToQueue(char cString[], integer iPriority) {
 	case false: {
 	    select {
 		active (uQueue.iStatusHead == max_length_array(cStatusQueue)): {
-		    if (uQueue.iStatusTail <> 1) {
+		    if (uQueue.iStatusTail != 1) {
 			uQueue.iStatusHead = 1
 			cStatusQueue[uQueue.iStatusHead] = cString
 			uQueue.iHasItems = true
 		    }
 		}
-		active (uQueue.iStatusTail <> (uQueue.iStatusHead + 1)): {
+		active (uQueue.iStatusTail != (uQueue.iStatusHead + 1)): {
 		    uQueue.iStatusHead++
 		    cStatusQueue[uQueue.iStatusHead] = cString
 		    uQueue.iHasItems = true
@@ -204,7 +204,7 @@ define_function char[NAV_MAX_BUFFER] RemoveFromQueue() {
     if (uQueue.iHasItems && !uQueue.iBusy) {
 	uQueue.iBusy = true
 	select {
-	    active (uQueue.iCommandHead <> uQueue.iCommandTail): {
+	    active (uQueue.iCommandHead != uQueue.iCommandTail): {
 		if (uQueue.iCommandTail == max_length_array(cCommandQueue)) {
 		    uQueue.iCommandTail = 1
 		}else {
@@ -213,7 +213,7 @@ define_function char[NAV_MAX_BUFFER] RemoveFromQueue() {
 
 		uQueue.cLastMess = cCommandQueue[uQueue.iCommandTail]
 	    }
-	    active (uQueue.iStatusHead <> uQueue.iStatusTail): {
+	    active (uQueue.iStatusHead != uQueue.iStatusTail): {
 		if (uQueue.iStatusTail == max_length_array(cStatusQueue)) {
 		    uQueue.iStatusTail = 1
 		}else {
@@ -289,7 +289,7 @@ define_function SendNextQueueItem() {
 
 	switch (iCommMode) {
 	    case COMM_MODE_TWO_WAY: {
-		timeline_create(TL_QUEUE_FAILED_RESPONSE,ltQueueFailedResponse,length_array(ltQueueFailedResponse),TIMELINE_ABSOLUTE,TIMELINE_ONCE)
+		NAVTimelineStart(TL_QUEUE_FAILED_RESPONSE,ltQueueFailedResponse,TIMELINE_ABSOLUTE,TIMELINE_ONCE)
 	    }
 	    case COMM_MODE_ONE_WAY: {
 		wait 5 GoodResponse()	//Move on if in one way mode
@@ -345,7 +345,7 @@ define_function Process() {
 	cTemp = remove_string(cRxBuffer,"NAV_LF",1)
 	if (length_array(cTemp)) {
 	    stack_var integer iResponseMessID
-	    NAVLog(NAVFormatStandardLogMessage(NAV_STANDARD_LOG_MESSAGE_TYPE_PARSING_STRING_FROM, dvPort, cTemp))
+	    NAVErrorLog(NAV_LOG_LEVEL_DEBUG, NAVFormatStandardLogMessage(NAV_STANDARD_LOG_MESSAGE_TYPE_PARSING_STRING_FROM, dvPort, cTemp))
 	    cTemp = NAVStripCharsFromRight(cTemp, 3)	//Removes |CR,LF
 	    select {
 		active (NAVContains(uQueue.cLastMess,'HEARTBEAT')): {
@@ -405,7 +405,7 @@ Reset()
 DEFINE_EVENT
 data_event[dvPort] {
     online: {
-	if (iModuleEnabled && data.device.number <> 0) {
+	if (iModuleEnabled && data.device.number != 0) {
 	    send_command data.device,"'SET MODE DATA'"
 	    send_command data.device,"'SET BAUD 19200,N,8,1 485 DISABLE'"
 	    send_command data.device,"'B9MOFF'"
@@ -414,8 +414,8 @@ data_event[dvPort] {
 	    send_command data.device,"'HSOFF'"
 	}
 
-	if (iModuleEnabled && data.device.number <> 0 && iCommMode == COMM_MODE_TWO_WAY) {
-	    timeline_create(TL_HEARTBEAT,ltHeartbeat,length_array(ltHeartbeat),TIMELINE_ABSOLUTE,TIMELINE_REPEAT)
+	if (iModuleEnabled && data.device.number != 0 && iCommMode == COMM_MODE_TWO_WAY) {
+	    NAVTimelineStart(TL_HEARTBEAT,ltHeartbeat,TIMELINE_ABSOLUTE,TIMELINE_REPEAT)
 	}
 
 	if (data.device.number == 0) {
@@ -426,7 +426,7 @@ data_event[dvPort] {
     }
     string: {
 	if (iModuleEnabled) {
-	    NAVLog(NAVFormatStandardLogMessage(NAV_STANDARD_LOG_MESSAGE_TYPE_STRING_TO, data.device, data.text))
+	    NAVErrorLog(NAV_LOG_LEVEL_DEBUG, NAVFormatStandardLogMessage(NAV_STANDARD_LOG_MESSAGE_TYPE_STRING_TO, data.device, data.text))
 	    select {
 		//active (NAVContains(cRxBuffer,"'user:'")): {
 		    //cRxBuffer = "''"; SendString(cUserName);
@@ -461,12 +461,12 @@ data_event[dvPort] {
     }
 }
 
-data_event[vdvControl] {
+data_event[vdvObject] {
     command: {
         stack_var char cCmdHeader[NAV_MAX_CHARS]
 	stack_var char cCmdParam[2][NAV_MAX_CHARS]
 	if (iModuleEnabled) {
-	    NAVLog(NAVFormatStandardLogMessage(NAV_STANDARD_LOG_MESSAGE_TYPE_COMMAND_FROM, data.device, data.text))
+	    NAVErrorLog(NAV_LOG_LEVEL_DEBUG, NAVFormatStandardLogMessage(NAV_STANDARD_LOG_MESSAGE_TYPE_COMMAND_FROM, data.device, data.text))
 	    cCmdHeader = DuetParseCmdHeader(data.text)
 	    cCmdParam[1] = DuetParseCmdParam(data.text)
 	    cCmdParam[2] = DuetParseCmdParam(data.text)
@@ -475,7 +475,7 @@ data_event[vdvControl] {
 		    switch (cCmdParam[1]) {
 			case 'IP_ADDRESS': {
 			    cIPAddress = cCmdParam[2]
-			    timeline_create(TL_IP_CHECK,ltIPCheck,length_array(ltIPCheck),timeline_absolute,timeline_repeat)
+			    NAVTimelineStart(TL_IP_CHECK,ltIPCheck,timeline_absolute,timeline_repeat)
 			}
 			case 'USER_NAME': {
 			    cUserName = cCmdParam[2]
@@ -494,7 +494,7 @@ data_event[vdvControl] {
 				case 'TWO-WAY': {
 				    iCommMode = COMM_MODE_TWO_WAY
 				    if (!timeline_active(TL_HEARTBEAT)) {
-					timeline_create(TL_HEARTBEAT,ltHeartbeat,length_array(ltHeartbeat),TIMELINE_ABSOLUTE,TIMELINE_REPEAT)
+					NAVTimelineStart(TL_HEARTBEAT,ltHeartbeat,TIMELINE_ABSOLUTE,TIMELINE_REPEAT)
 				    }
 
 				    NAVCommandArray(vdvCommObjects,'PROPERTY-COMM_MODE,TWO-WAY')
@@ -507,14 +507,14 @@ data_event[vdvControl] {
 		    stack_var integer x
 		    for (x = 1; x <= length_array(vdvCommObjects); x++) {
 			send_string vdvCommObjects[x],"'REGISTER<',itoa(x),'>'"
-			NAVLog("'AUDAC_SMQ_REGISTER_SENT<',itoa(x),'>'")
+			NAVErrorLog(NAV_LOG_LEVEL_DEBUG, "'AUDAC_SMQ_REGISTER_SENT<',itoa(x),'>'")
 		    }
 
-		    //timeline_create(TL_REGISTER,ltRegister,length_array(ltRegister),TIMELINE_ABSOLUTE,TIMELINE_REPEAT)
+		    //NAVTimelineStart(TL_REGISTER,ltRegister,TIMELINE_ABSOLUTE,TIMELINE_REPEAT)
 
 		    //iReadyToInitialize = true
 		    //if (data
-		    //timeline_create(TL_HEARTBEAT,ltHeartbeat,length_array(ltHeartbeat),TIMELINE_ABSOLUTE,TIMELINE_REPEAT)
+		    //NAVTimelineStart(TL_HEARTBEAT,ltHeartbeat,TIMELINE_ABSOLUTE,TIMELINE_REPEAT)
 		}
 	    }
 	}
@@ -524,16 +524,16 @@ data_event[vdvControl] {
 data_event[vdvCommObjects] {
     online: {
 	//if (get_last(vdvCommObjects) == length_array(vdvCommObjects)) {
-	  //  timeline_create(TL_REGISTER,ltRegister,length_array(ltRegister),TIMELINE_ABSOLUTE,TIMELINE_REPEAT)
+	  //  NAVTimelineStart(TL_REGISTER,ltRegister,TIMELINE_ABSOLUTE,TIMELINE_REPEAT)
 	//}
 	send_string data.device,"'REGISTER<',itoa(get_last(vdvCommObjects)),'>'"
-	NAVLog("'AUDAC_SMQ_REGISTER<',itoa(get_last(vdvCommObjects)),'>'")
+	NAVErrorLog(NAV_LOG_LEVEL_DEBUG, "'AUDAC_SMQ_REGISTER<',itoa(get_last(vdvCommObjects)),'>'")
     }
     command: {
 	if (iModuleEnabled) {
 	    stack_var char cCmdHeader[NAV_MAX_CHARS]
 	    stack_var integer iResponseObjectMessID
-	   NAVLog(NAVFormatStandardLogMessage(NAV_STANDARD_LOG_MESSAGE_TYPE_COMMAND_FROM, data.device, data.text))
+	   NAVErrorLog(NAV_LOG_LEVEL_DEBUG, NAVFormatStandardLogMessage(NAV_STANDARD_LOG_MESSAGE_TYPE_COMMAND_FROM, data.device, data.text))
 	    cCmdHeader = DuetParseCmdHeader(data.text)
 	    switch (cCmdHeader) {
 		case 'COMMAND_MSG': { AddToQueue("cCmdHeader,data.text",true) }
@@ -550,7 +550,7 @@ data_event[vdvCommObjects] {
 		    InitializeObjects()
 		    if (get_last(vdvCommObjects) == length_array(vdvCommObjects)) {
 			//Init is Done!
-			send_string vdvControl,"'INIT_DONE'"
+			send_string vdvObject,"'INIT_DONE'"
 		    }
 		}
 		case 'REGISTER': {
@@ -610,17 +610,17 @@ timeline_event[TL_REGISTER] {
     stack_var integer x
     x = type_cast(timeline.repetition + 1)
     send_string vdvCommObjects[x],"'REGISTER<',itoa(x),'>'"
-    NAVLog("'AUDAC_SMQ_REGISTER_SENT<',itoa(x),'>'")
+    NAVErrorLog(NAV_LOG_LEVEL_DEBUG, "'AUDAC_SMQ_REGISTER_SENT<',itoa(x),'>'")
     if (x == length_array(vdvCommObjects)) {
-	timeline_kill(timeline.id)
+	NAVTimelineStop(timeline.id)
     }
 }
 
 timeline_event[TL_NAV_FEEDBACK] {
     if (iModuleEnabled) {
-	[vdvControl,NAV_IP_CONNECTED]	= (iIPConnected && iIPAuthenticated)
-	[vdvControl,DEVICE_COMMUNICATING] = (iCommunicating)
-	[vdvControl,DATA_INITIALIZED] = (iInitialized)
+	[vdvObject,NAV_IP_CONNECTED]	= (iIPConnected && iIPAuthenticated)
+	[vdvObject,DEVICE_COMMUNICATING] = (iCommunicating)
+	[vdvObject,DATA_INITIALIZED] = (iInitialized)
     }
 }
 
