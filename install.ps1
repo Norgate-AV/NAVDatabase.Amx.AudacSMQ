@@ -103,9 +103,6 @@ function Get-GitHubRelease {
 
     $files = @("$repo.$version.archive.zip")
 
-    # Ensure all `.` are replaced with `-` in the destination path
-    # $destinationPath = $destinationPath.Replace(".", "-")
-
     try {
         foreach ($file in $files) {
             $fileUrl = "$url/$file"
@@ -538,11 +535,11 @@ try {
             } else {
                 # This will allow the NLRC to find the files without having to add them to the .genlinxrc file
                 # This is a workaround until we can figure out how to add the paths to the .genlinxrc file
-                Add-Symlinks -Path $packagePath -Extension "axi" -TargetDirectory "$Path/Include" -GitIgnore
+                Add-Symlinks -Path $packagePath -Extension "axi" -TargetDirectory "$Path/lib" -GitIgnore
 
                 # tko, jar files are already ignored by Git
-                Add-Symlinks -Path $packagePath -Extension "tko" -TargetDirectory "$Path/Module"
-                Add-Symlinks -Path $packagePath -Extension "jar" -TargetDirectory "$Path/Module"
+                Add-Symlinks -Path $packagePath -Extension "tko" -TargetDirectory "$Path/src"
+                Add-Symlinks -Path $packagePath -Extension "jar" -TargetDirectory "$Path/src"
             }
 
             Write-Host "Successfully installed $($repoInfo.Repo)@$($version)"
