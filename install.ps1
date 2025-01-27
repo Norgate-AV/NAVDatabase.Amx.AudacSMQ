@@ -104,7 +104,7 @@ function Get-GitHubRelease {
     $files = @("$repo.$version.archive.zip")
 
     # Ensure all `.` are replaced with `-` in the destination path
-    $destinationPath = $destinationPath.Replace(".", "-")
+    # $destinationPath = $destinationPath.Replace(".", "-")
 
     try {
         foreach ($file in $files) {
